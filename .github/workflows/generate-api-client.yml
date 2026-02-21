@@ -2,13 +2,8 @@ name: Generate & Publish API Client
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/src/**'
-      - 'backend/build.gradle.kts'
-      - 'backend/openapi-templates/**'
-      - 'backend/buildSrc/**'
+  release:
+    types: [published]
 
 jobs:
   generate-and-publish:
@@ -30,13 +25,18 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Extract version from build.gradle.kts
+      - name: Determine version
         id: version
         run: |
-          RAW_VERSION=$(grep '^version' backend/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
-          NPM_VERSION="${RAW_VERSION%-SNAPSHOT}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            NPM_VERSION="${{ github.event.release.tag_name }}"
+            NPM_VERSION="${NPM_VERSION#v}"
+          else
+            RAW_VERSION=$(grep '^version' backend/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+            NPM_VERSION="${RAW_VERSION%-SNAPSHOT}"
+          fi
           echo "version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Backend version: $RAW_VERSION -> npm version: $NPM_VERSION"
+          echo "npm version: $NPM_VERSION"
 
       - name: Check if version already published
         id: check
