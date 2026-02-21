@@ -16,12 +16,17 @@ abstract class ExtractSwaggerTask : DefaultTask() {
 
     init {
         group = "api-client"
-        description = "Start backend server, extract swagger.json, then stop"
+        description = "Build boot jar, start server, extract swagger.json, then stop"
+        dependsOn("bootJar")
     }
 
     @TaskAction
     fun extract() {
-        val bootRun = ProcessBuilder("${project.projectDir}/gradlew", "bootRun", "-q")
+        val jarFile = project.file("build/libs").listFiles()
+            ?.firstOrNull { it.name.endsWith(".jar") && !it.name.contains("plain") }
+            ?: throw RuntimeException("Boot jar not found. Run bootJar first.")
+
+        val server = ProcessBuilder("java", "-jar", jarFile.absolutePath)
             .directory(project.projectDir)
             .redirectErrorStream(true)
             .start()
@@ -32,12 +37,8 @@ abstract class ExtractSwaggerTask : DefaultTask() {
             swaggerFile.writeText(json)
             logger.lifecycle("swagger.json extracted (${swaggerFile.length()} bytes)")
         } finally {
-            bootRun.destroyForcibly()
-            try {
-                ProcessBuilder("bash", "-c", "lsof -ti:8080 | xargs kill -9 2>/dev/null || true")
-                    .start().waitFor()
-            } catch (_: Exception) {}
-            Thread.sleep(2000)
+            server.destroyForcibly()
+            server.waitFor()
         }
     }
 
