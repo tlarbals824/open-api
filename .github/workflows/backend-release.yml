@@ -34,7 +34,7 @@ jobs:
             MAJOR=$(echo "$VERSION" | cut -d. -f1)
             MINOR=$(echo "$VERSION" | cut -d. -f2)
             PATCH=$(echo "$VERSION" | cut -d. -f3)
-            NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
           fi
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
