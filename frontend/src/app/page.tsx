@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createApi, publicApi, saveToken, getToken, removeToken } from "@/lib/api";
+import { createAuthApi, createUserApi, publicAuthApi, saveToken, getToken, removeToken } from "@/lib/api";
 import type { UserResponse, LoginResponse } from "@ject-2-test/backend-api-client";
 
 export default function Home() {
@@ -24,7 +24,7 @@ export default function Home() {
   const handleLogin = async () => {
     try {
       setError(null);
-      const { data } = await publicApi.login({
+      const { data } = await publicAuthApi.login({
         email: "admin@example.com",
         password: "password123",
       });
@@ -49,7 +49,7 @@ export default function Home() {
     if (!token) return setError("먼저 로그인해주세요");
     try {
       setError(null);
-      const { data } = await createApi().getAllUsers();
+      const { data } = await createUserApi().getAllUsers();
       setUsers(data);
     } catch {
       setError("사용자 목록 조회 실패");
@@ -60,7 +60,7 @@ export default function Home() {
     if (!token) return setError("먼저 로그인해주세요");
     try {
       setError(null);
-      const { data } = await createApi().getUserById(Number(userId));
+      const { data } = await createUserApi().getUserById(Number(userId));
       setSingleUser(data);
     } catch {
       setError("사용자 조회 실패");

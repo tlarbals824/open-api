@@ -1,4 +1,4 @@
-import { DefaultApi, Configuration } from "@ject-2-test/backend-api-client";
+import { AuthApi, UserApi, Configuration } from "@ject-2-test/backend-api-client";
 
 const BASE_URL = "http://localhost:8080";
 const TOKEN_KEY = "access_token";
@@ -20,13 +20,20 @@ export function removeToken() {
   if (isBrowser()) sessionStorage.removeItem(TOKEN_KEY);
 }
 
-export function createApi(accessToken?: string) {
+function createConfig(accessToken?: string) {
   const token = accessToken ?? getToken() ?? undefined;
-  const config = new Configuration({
+  return new Configuration({
     basePath: BASE_URL,
     accessToken: token,
   });
-  return new DefaultApi(config);
 }
 
-export const publicApi = createApi();
+export function createAuthApi(accessToken?: string) {
+  return new AuthApi(createConfig(accessToken));
+}
+
+export function createUserApi(accessToken?: string) {
+  return new UserApi(createConfig(accessToken));
+}
+
+export const publicAuthApi = createAuthApi();
