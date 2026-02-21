@@ -1,6 +1,7 @@
 name: Generate & Publish API Client
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
