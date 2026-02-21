@@ -5,6 +5,8 @@ import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.openapitools.codegen.DefaultGenerator
+import org.openapitools.codegen.config.CodegenConfigurator
 import java.io.File
 
 abstract class GenerateApiClientTask : DefaultTask() {
@@ -27,21 +29,17 @@ abstract class GenerateApiClientTask : DefaultTask() {
     fun generate() {
         if (outputDir.exists()) outputDir.deleteRecursively()
 
-        val result = ProcessBuilder(
-            "npx", "@openapitools/openapi-generator-cli", "generate",
-            "-i", swaggerFile.absolutePath,
-            "-g", "typescript-axios",
-            "-o", outputDir.absolutePath,
-            "-t", templatesDir.absolutePath,
-            "--additional-properties=supportsES6=true,withSeparateModelsAndApi=true,apiPackage=api,modelPackage=models"
-        )
-            .directory(project.projectDir)
-            .redirectErrorStream(true)
-            .start()
-
-        result.inputStream.bufferedReader().forEachLine { logger.lifecycle(it) }
-        val exitCode = result.waitFor()
-        if (exitCode != 0) throw RuntimeException("openapi-generator failed with exit code $exitCode")
+        val config = CodegenConfigurator().apply {
+            setInputSpec(swaggerFile.absolutePath)
+            setGeneratorName("typescript-axios")
+            setOutputDir(outputDir.absolutePath)
+            setTemplateDir(templatesDir.absolutePath)
+            addAdditionalProperty("supportsES6", "true")
+            addAdditionalProperty("withSeparateModelsAndApi", "true")
+            addAdditionalProperty("apiPackage", "api")
+            addAdditionalProperty("modelPackage", "models")
+        }
+        DefaultGenerator().opts(config.toClientOptInput()).generate()
 
         val version = project.version.toString().removeSuffix("-SNAPSHOT")
 
