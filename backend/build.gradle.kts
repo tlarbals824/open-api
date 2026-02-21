@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.sim"
-version = "0.1.0"
+version = "0.1.1"
 description = "backend"
 
 java {
