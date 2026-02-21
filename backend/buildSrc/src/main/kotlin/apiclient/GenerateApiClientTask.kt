@@ -13,7 +13,7 @@ abstract class GenerateApiClientTask : DefaultTask() {
     val swaggerFile: File = project.file("swagger.json")
 
     @get:InputDirectory
-    val templatesDir: File = project.file("openapi-templates")
+    val templatesDir: File = project.file("api-client-templates")
 
     @get:OutputDirectory
     val outputDir: File = project.file("generated-api-client")
@@ -45,51 +45,12 @@ abstract class GenerateApiClientTask : DefaultTask() {
 
         val version = project.version.toString().removeSuffix("-SNAPSHOT")
 
-        File(outputDir, "package.json").writeText(
-            """{
-  "name": "@ject-2-test/backend-api-client",
-  "version": "$version",
-  "description": "Backend API client generated from OpenAPI spec",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": ["dist"],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
-  },
-  "dependencies": {
-    "axios": "^1.7.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.5.0"
-  },
-  "license": "MIT"
-}
-"""
-        )
+        // Copy template files with version substitution
+        File(templatesDir, "package.json").readText()
+            .replace("\"version\": \"0.0.0\"", "\"version\": \"$version\"")
+            .let { File(outputDir, "package.json").writeText(it) }
 
-        File(outputDir, "tsconfig.json").writeText(
-            """{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020", "DOM"],
-    "declaration": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "."
-  },
-  "include": ["*.ts", "api/**/*.ts", "models/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
-}
-"""
-        )
+        File(templatesDir, "tsconfig.json").copyTo(File(outputDir, "tsconfig.json"), overwrite = true)
 
         logger.lifecycle("API client generated at ${outputDir.absolutePath} (version: $version)")
     }

@@ -8,6 +8,7 @@ on:
       - 'backend/src/**'
       - 'backend/build.gradle.kts'
       - 'backend/buildSrc/**'
+      - 'backend/api-client-templates/**'
 
 jobs:
   release:
