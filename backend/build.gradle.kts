@@ -47,3 +47,14 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// API Client Generation Tasks
+val extractSwagger by tasks.registering(apiclient.ExtractSwaggerTask::class)
+
+val generateApiClient by tasks.registering(apiclient.GenerateApiClientTask::class) {
+    dependsOn(extractSwagger)
+}
+
+val publishApiClient by tasks.registering(apiclient.PublishApiClientTask::class) {
+    dependsOn(generateApiClient)
+}
