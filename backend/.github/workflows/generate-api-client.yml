@@ -1,0 +1,143 @@
+name: Generate & Publish API Client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/src/**'
+      - 'backend/build.gradle.kts'
+      - 'backend/openapi-templates/**'
+
+jobs:
+  generate-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Extract version from build.gradle.kts
+        id: version
+        run: |
+          RAW_VERSION=$(grep '^version' backend/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          # Remove -SNAPSHOT suffix for npm
+          NPM_VERSION="${RAW_VERSION%-SNAPSHOT}"
+          echo "version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Backend version: $RAW_VERSION -> npm version: $NPM_VERSION"
+
+      - name: Check if version already published
+        id: check
+        run: |
+          PUBLISHED=$(npm view @ject-2-test/backend-api-client@${{ steps.version.outputs.version }} version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "${{ steps.version.outputs.version }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${{ steps.version.outputs.version }} already published. Skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Backend build
+        if: steps.check.outputs.skip == 'false'
+        run: cd backend && ./gradlew clean compileKotlin -q
+
+      - name: Start backend & extract swagger.json
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          cd backend
+          ./gradlew bootRun -q &
+          BOOT_PID=$!
+
+          for i in $(seq 1 30); do
+            curl -s http://localhost:8080/v3/api-docs > /dev/null 2>&1 && break
+            sleep 2
+          done
+
+          curl -s http://localhost:8080/v3/api-docs | python3 -m json.tool > swagger.json
+          echo "swagger.json extracted"
+
+          kill $BOOT_PID 2>/dev/null || true
+          sleep 2
+          # Kill any leftover java process on port 8080
+          fuser -k 8080/tcp 2>/dev/null || true
+
+      - name: Generate TypeScript API client
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          npx @openapitools/openapi-generator-cli generate \
+            -i backend/swagger.json \
+            -g typescript-axios \
+            -o generated-api-client \
+            -t backend/openapi-templates \
+            --additional-properties=supportsES6=true,withSeparateModelsAndApi=true,apiPackage=api,modelPackage=models
+
+      - name: Setup npm package
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          cd generated-api-client
+
+          cat > package.json <<EOF
+          {
+            "name": "@ject-2-test/backend-api-client",
+            "version": "${{ steps.version.outputs.version }}",
+            "description": "Backend API client generated from OpenAPI spec",
+            "main": "dist/index.js",
+            "types": "dist/index.d.ts",
+            "files": ["dist"],
+            "scripts": {
+              "build": "tsc",
+              "prepublishOnly": "npm run build"
+            },
+            "dependencies": {
+              "axios": "^1.7.0"
+            },
+            "devDependencies": {
+              "typescript": "^5.5.0"
+            },
+            "license": "MIT"
+          }
+          EOF
+
+          cat > tsconfig.json <<EOF
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "commonjs",
+              "lib": ["ES2020", "DOM"],
+              "declaration": true,
+              "strict": true,
+              "noImplicitAny": true,
+              "strictNullChecks": true,
+              "moduleResolution": "node",
+              "esModuleInterop": true,
+              "skipLibCheck": true,
+              "forceConsistentCasingInFileNames": true,
+              "outDir": "./dist",
+              "rootDir": "."
+            },
+            "include": ["*.ts", "api/**/*.ts", "models/**/*.ts"],
+            "exclude": ["node_modules", "dist"]
+          }
+          EOF
+
+      - name: Install, build & publish
+        if: steps.check.outputs.skip == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd generated-api-client
+          npm install
+          npm run build
+          npm publish --access public
+          echo "Published @ject-2-test/backend-api-client@${{ steps.version.outputs.version }}"
